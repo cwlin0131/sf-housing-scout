@@ -12,7 +12,7 @@ import { apiKey, KEY_HELP } from './config.js';
  * confirm before the record is saved.
  */
 
-const MODEL = 'claude-opus-5';
+const MODEL = 'claude-opus-5-5';
 
 let client = null;
 function anthropic() {
@@ -21,46 +21,47 @@ function anthropic() {
   return (client ??= new Anthropic({ apiKey: key }));
 }
 
-const SCHEMA = {
-  name: 'listing_fields',
-  description: 'Fields read off a rental listing screenshot',
-  input_schema: {
-    type: 'object',
-    properties: {
-      address: { type: ['string', 'null'], description: 'Full street address including the number. Null if not visible; never guess it from a neighbourhood name' },
-      unit: { type: ['string', 'null'], description: 'Unit or apartment number' },
-      price: { type: ['number', 'null'], description: 'Monthly rent as a plain number. Take the lower bound of a range' },
-      monthly_fees: { type: ['number', 'null'], description: 'Recurring monthly charges on top of rent (utilities, trash, HOA and so on)' },
-      deposit: { type: ['number', 'null'] },
-      beds: { type: ['number', 'null'], description: 'A studio is 0' },
-      baths: { type: ['number', 'null'] },
-      sqft: { type: ['number', 'null'] },
-      lease_term: { type: ['string', 'null'] },
-      pets: { type: ['string', 'null'] },
-      parking: { type: ['string', 'null'] },
-      laundry: { type: ['string', 'null'] },
-      furnished: { type: ['boolean', 'null'] },
-      available_from: { type: ['string', 'null'], description: 'YYYY-MM-DD, or "now"' },
-      listed_days_ago: {
-        type: ['number', 'null'],
-        description: 'How long it has been up, in whole days. Zillow writes this as "5 days on Zillow", "Listed 3 days ago", "2 hours ago" (under a day is 0). Null if not shown; never derive it from the available-from date',
-      },
-      url: { type: ['string', 'null'], description: 'Fill in if the address bar is visible in a screenshot' },
-      source_site: { type: ['string', 'null'], description: 'For example Zillow, Craigslist, Apartments.com' },
-      confidence: {
-        type: 'object',
-        description: 'Mark every field you filled as high or low. High means it was plainly legible',
-        additionalProperties: { type: 'string', enum: ['high', 'low'] },
-      },
-      unreadable: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Names of fields that appear but are hard to read, or that disagree between screenshots',
-      },
+// Returned as structured output rather than through a forced tool call: Opus 5.5 rejects
+// tool_choice "tool", and the call only ever existed to get JSON back. Structured output
+// requires every object to be closed and every field listed in `required`, so absent
+// values come back as null rather than missing.
+const FIELDS = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    address: { type: ['string', 'null'], description: 'Full street address including the number. Null if not visible; never guess it from a neighbourhood name' },
+    unit: { type: ['string', 'null'], description: 'Unit or apartment number' },
+    price: { type: ['number', 'null'], description: 'Monthly rent as a plain number. Take the lower bound of a range' },
+    monthly_fees: { type: ['number', 'null'], description: 'Recurring monthly charges on top of rent (utilities, trash, HOA and so on)' },
+    deposit: { type: ['number', 'null'] },
+    beds: { type: ['number', 'null'], description: 'A studio is 0' },
+    baths: { type: ['number', 'null'] },
+    sqft: { type: ['number', 'null'] },
+    lease_term: { type: ['string', 'null'] },
+    pets: { type: ['string', 'null'] },
+    parking: { type: ['string', 'null'] },
+    laundry: { type: ['string', 'null'] },
+    furnished: { type: ['boolean', 'null'] },
+    available_from: { type: ['string', 'null'], description: 'YYYY-MM-DD, or "now"' },
+    listed_days_ago: {
+      type: ['number', 'null'],
+      description: 'How long it has been up, in whole days. Zillow writes this as "5 days on Zillow", "Listed 3 days ago", "2 hours ago" (under a day is 0). Null if not shown; never derive it from the available-from date',
     },
-    required: ['address', 'price', 'beds', 'confidence', 'unreadable'],
+    url: { type: ['string', 'null'], description: 'Fill in if the address bar is visible in a screenshot' },
+    source_site: { type: ['string', 'null'], description: 'For example Zillow, Craigslist, Apartments.com' },
+    low_confidence: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Names of fields you filled but could not read plainly',
+    },
+    unreadable: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Names of fields that appear but are hard to read, or that disagree between screenshots',
+    },
   },
 };
+FIELDS.required = Object.keys(FIELDS.properties);
 
 const SYSTEM = `You are reading structured fields off screenshots of a rental listing. The user pastes several images at once; they are different parts of the same listing scrolled down, not different listings.
 
@@ -70,46 +71,53 @@ Rules:
 - If a price is a range, for example $3,200 to $3,800, take the lower bound.
 - A studio has beds 0.
 - When two images disagree on a field, take the clearer one and put the field name in unreadable.
-- Every field you filled needs a high or low entry in confidence.`;
+- List in low_confidence every field you filled but could not read plainly.`;
 
 export async function extractFromImages(images) {
-  if (!images?.length) throw new Error('No images were received.');
-  if (images.length > 8) throw new Error('Eight images at most per listing.');
+  if (!images?.length) fail('listing.empty_input', 'Paste a Zillow link, an address, or a screenshot.');
+  if (images.length > 8) fail('listing.too_many_images', 'Eight screenshots at most per listing.');
 
   const content = images.map((img, i) => ([
     { type: 'text', text: `Image ${i + 1} of ${images.length}:` },
     { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } },
   ])).flat();
 
-  content.push({
-    type: 'text',
-    text: 'Merge these screenshots into one listing record and return it by calling the listing_fields tool.',
-  });
+  content.push({ type: 'text', text: 'Merge these screenshots into one listing record.' });
 
   const res = await anthropic().messages.create({
     model: MODEL,
-    max_tokens: 2000,
+    // Thinking counts against max_tokens on this model, so this leaves room for it on top
+    // of a record that is itself only a few hundred tokens.
+    max_tokens: 8000,
+    // Set explicitly: Opus 5.5 defaults to medium, and misreading a price is the one
+    // mistake here that costs the user money, so it is not the place to save effort.
+    output_config: {
+      effort: 'medium',
+      format: { type: 'json_schema', schema: FIELDS },
+    },
     system: SYSTEM,
-    tools: [SCHEMA],
-    tool_choice: { type: 'tool', name: 'listing_fields' },
     messages: [{ role: 'user', content }],
   });
 
   if (res.stop_reason === 'refusal') {
     fail('ai.refused', `The model declined to read these screenshots (${res.stop_details?.category || 'uncategorised'}).`);
   }
-  const call = res.content.find((c) => c.type === 'tool_use');
-  if (!call) fail('ai.no_output', 'The model did not return a structured result.');
+  if (res.stop_reason === 'max_tokens') {
+    fail('ai.truncated', 'The screenshot reading was cut off by max_tokens; raise it in vision.js.');
+  }
+  const text = res.content.filter((c) => c.type === 'text').map((c) => c.text).join('');
+  let f;
+  try {
+    f = JSON.parse(text);
+  } catch {
+    fail('ai.no_output', 'The model did not return a structured result.');
+  }
 
-  const f = call.input;
   return {
     fields: f,
     // Surface everything the model was unsure about so the preview card can highlight it
     // instead of quietly saving a wrong price.
-    needsReview: [
-      ...(f.unreadable || []),
-      ...Object.entries(f.confidence || {}).filter(([, v]) => v === 'low').map(([k]) => k),
-    ].filter((v, i, a) => a.indexOf(v) === i),
+    needsReview: [...new Set([...(f.unreadable || []), ...(f.low_confidence || [])])],
     usage: res.usage,
   };
 }

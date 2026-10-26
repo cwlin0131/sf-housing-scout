@@ -267,13 +267,16 @@ export function getListing(id) {
   return hydrate(row);
 }
 
+const STATUSES = ['saved', 'rejected', 'deactivated', 'candidate'];
+
 export function listListings({ status = 'saved', includeInactive = true } = {}) {
+  // `status` arrives straight from the query string, so it is checked against the known
+  // values and bound as a parameter rather than pasted into the SQL.
+  if (status !== 'all' && !STATUSES.includes(status)) {
+    fail('listing.bad_status', `Unknown status: ${status}`, { status });
+  }
   const where =
-    status === 'all'
-      ? '1=1'
-      : includeInactive
-        ? `l.status IN ('${status}','deactivated')`
-        : `l.status = '${status}'`;
+    status === 'all' ? '1=1' : includeInactive ? `l.status IN (@status, 'deactivated')` : 'l.status = @status';
   return db
     .prepare(
       `SELECT l.*, s.safety, s.convenience, s.price_score, s.overall_stars, s.breakdown_json,
@@ -286,7 +289,7 @@ export function listListings({ status = 'saved', includeInactive = true } = {}) 
        WHERE ${where}
        ORDER BY s.overall_stars DESC NULLS LAST, l.first_seen_at DESC`
     )
-    .all()
+    .all(status === 'all' ? {} : { status })
     .map(hydrate);
 }
 
@@ -330,6 +333,8 @@ export async function refreshListings(limit = 10) {
     try {
       const { nextData } = await fetchZillow(row.url);
       const live = stillListed(nextData);
+      // An unreadable page is a failed check, handled like any other error below.
+      if (live.live == null) throw new Error(`Could not read the page (${live.status}).`);
       const fresh = normalize(nextData, row.url);
       const newPrice = fresh?.price ?? null;
 
@@ -375,8 +380,7 @@ export async function refreshListings(limit = 10) {
 }
 
 export function setStatus(id, status, reason) {
-  const valid = ['saved', 'rejected', 'deactivated', 'candidate'];
-  if (!valid.includes(status)) fail('listing.bad_status', `Unknown status: ${status}`, { status });
+  if (!STATUSES.includes(status)) fail('listing.bad_status', `Unknown status: ${status}`, { status });
   db.prepare(
     `UPDATE listing SET status = ?,
        deactivated_at = CASE WHEN ? = 'deactivated' THEN datetime('now') ELSE deactivated_at END,

@@ -142,7 +142,7 @@
   "settings.weight_safety": "治安權重",
   "settings.weight_convenience": "方便權重",
   "settings.avoid_title": "你要迴避的區域",
-  "settings.avoid_hint": "你實際走過、決定不考慮的地方。物件落在裡面時治安分數會被壓到你設的上限，而且卡片會講明白，不是偷偷降分。任何社區名稱都可以，包含地圖沒有標的，例如 Dogpatch。",
+  "settings.avoid_hint": "你實際走過、決定不考慮的地方。物件落在裡面時治安分數會被壓到你設的上限，而且卡片會講明白，不是偷偷降分。請從建議清單選名稱：比對的是完整名稱，所以排除 Mission 不會連 Mission Bay 一起壓分。Dogpatch 這類較小的區名也在清單裡。",
   "settings.avoid_name": "區域名稱",
   "settings.avoid_cap": "上限",
   "settings.avoid_add": "加入",
@@ -257,7 +257,7 @@
   "err.ai.refused": "模型拒絕回答。",
   "err.ai.truncated": "模型還沒寫完就用完額度。",
   "err.ai.no_output": "模型沒有回傳可用的內容。",
-  "err.fetch.chrome_missing": "找不到 Chrome。設定 CHROME_PATH 環境變數指向 chrome.exe。",
+  "err.fetch.chrome_missing": "找不到 Chrome。請在 .env 設定 CHROME_PATH，指到這台電腦上的 Chrome 程式。",
   "err.fetch.blocked": "Zillow 跳驗證了，去那個 Chrome 視窗按住按鈕。",
   "note.no_crime_data": "尚未同步犯罪資料，只根據區域概況",
   "note.no_stop_nearby": "找不到附近車站",
@@ -336,5 +336,7 @@
   "commute.walk_alt": "全程走路：{n} 分",
   "commute.estimate_note": "估算值，只算走路、BART、Muni Metro，不含公車。",
   "commute.open_maps": "用 Google Maps 查實際路線",
-  "commute.no_home": "到「插旗與設定」設好核心地址，每個物件都會顯示通勤時間。"
+  "commute.no_home": "到「插旗與設定」設好核心地址，每個物件都會顯示通勤時間。",
+  "err.listing.too_many_images": "每個物件最多八張截圖。",
+  "add.slow_hint": "還在算。新區域的第一筆物件要向公共服務查詢附近商店和地形，最久可能要一分鐘；之後附近的物件就會很快。"
 }

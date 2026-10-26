@@ -142,7 +142,7 @@
   "settings.weight_safety": "Safety weight",
   "settings.weight_convenience": "Convenience weight",
   "settings.avoid_title": "Areas you rule out",
-  "settings.avoid_hint": "Somewhere you have walked and decided against. A listing inside one has its safety score capped at the number you set, and the card says so rather than quietly lowering it. Any neighbourhood name works, including ones the map does not label, such as Dogpatch.",
+  "settings.avoid_hint": "Somewhere you have walked and decided against. A listing inside one has its safety score capped at the number you set, and the card says so rather than quietly lowering it. Pick the name from the suggestions: it has to match the whole name, so ruling out Mission does not also cap Mission Bay. Smaller names such as Dogpatch are on the list too.",
   "settings.avoid_name": "Area name",
   "settings.avoid_cap": "Cap",
   "settings.avoid_add": "Add",
@@ -257,7 +257,7 @@
   "err.ai.refused": "The model declined to answer.",
   "err.ai.truncated": "The model ran out of room before finishing.",
   "err.ai.no_output": "The model returned nothing usable.",
-  "err.fetch.chrome_missing": "Could not find Chrome. Set CHROME_PATH to your chrome.exe.",
+  "err.fetch.chrome_missing": "Could not find Chrome. Set CHROME_PATH in .env to the Chrome program on this computer.",
   "err.fetch.blocked": "Zillow is showing a challenge. Solve it in the Chrome window that opened.",
   "note.no_crime_data": "crime data not synced yet, area read only",
   "note.no_stop_nearby": "no rail stop found nearby",
@@ -336,5 +336,7 @@
   "commute.walk_alt": "Walking all the way: {n} min",
   "commute.estimate_note": "Estimate using walking, BART and Muni Metro. Buses not included.",
   "commute.open_maps": "Check in Google Maps",
-  "commute.no_home": "Set a core address under Pins and settings to see the commute for every listing."
+  "commute.no_home": "Set a core address under Pins and settings to see the commute for every listing.",
+  "err.listing.too_many_images": "Eight screenshots at most per listing.",
+  "add.slow_hint": "Still working. The first listing near a new spot looks up nearby shops and hills from shared public services, which can take up to a minute. Later ones nearby are instant."
 }

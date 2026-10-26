@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { DATA_DIR } from './paths.js';
 
 /**
  * Curated area overlay: a coarse, sourced read of how each part of the city feels, used
@@ -10,7 +11,7 @@ import { resolve } from 'node:path';
  * for", which is what a person actually asks first.
  */
 
-const PATH = resolve(process.cwd(), 'data/safety-zones.json');
+const PATH = resolve(DATA_DIR, 'safety-zones.json');
 
 let cache = null;
 export function loadZones() {

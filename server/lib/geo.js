@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { db, cacheGet, cacheSet } from './db.js';
 import { DATA, LIFESTYLE } from './config.js';
+import { DATA_DIR } from './paths.js';
 
 const R = 6371000; // earth radius, metres
 const rad = (d) => (d * Math.PI) / 180;
@@ -186,7 +188,7 @@ let stopsCache = null;
 export function loadStops() {
   if (stopsCache) return stopsCache;
   try {
-    const raw = JSON.parse(readFileSync('data/transit-stops.geojson', 'utf8'));
+    const raw = JSON.parse(readFileSync(resolve(DATA_DIR, 'transit-stops.geojson'), 'utf8'));
     stopsCache = raw.features.map((f) => ({
       mode: f.properties.mode,
       name: f.properties.name,
@@ -207,7 +209,7 @@ export function nearestTransit(lat, lng) {
     const d = Math.round(distanceMetres(lat, lng, s.lat, s.lng));
     const slot = s.mode === 'bart' ? 'bart' : 'muni_metro';
     if (!best[slot] || d < best[slot].metres) {
-      best[slot] = { metres: d, name: s.name, lines: s.lines, minutes: +walkMinutes(d).toFixed(1) };
+      best[slot] = { metres: d, name: s.name, lines: s.lines, minutes: +walkMinutes(d).toFixed(1), lat: s.lat, lng: s.lng };
     }
   }
   // How many distinct rail lines are reachable on foot, as a proxy for real optionality.

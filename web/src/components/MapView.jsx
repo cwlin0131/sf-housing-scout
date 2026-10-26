@@ -111,7 +111,7 @@ export default function MapView({
       L.geoJSON(f, {
         style: { color: f.properties.color || '#4FB8AD', weight: f.properties.mode === 'bart' ? 4 : 2.5, opacity: 0.85 },
       })
-        .bindPopup(`<b>${f.properties.name || f.properties.line}</b>`)
+        .bindPopup(`<b>${esc(f.properties.name || f.properties.line)}</b>`)
         .addTo(g);
     }
     for (const f of transit.stops.features || []) {
@@ -124,7 +124,7 @@ export default function MapView({
         fillColor: isBart ? '#0099CC' : '#3A4845',
         fillOpacity: 0.9,
       })
-        .bindPopup(`<b>${f.properties.name}</b><br/>${isBart ? 'BART' : 'Muni Metro'} ${(f.properties.lines || []).join(' ')}`)
+        .bindPopup(`<b>${esc(f.properties.name)}</b><br/>${isBart ? 'BART' : 'Muni Metro'} ${esc((f.properties.lines || []).join(' '))}`)
         .addTo(g);
     }
   }, [transit, layers.transit]);
@@ -139,19 +139,19 @@ export default function MapView({
       L.marker([home.lat, home.lng], {
         icon: L.divIcon({ className: '', html: '<div class="home-pin">⌂</div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
       })
-        .bindPopup(`<b>${name}</b><br/>${home.address}<br/><span style="opacity:.6">${t('map.home_hint')}</span>`)
+        .bindPopup(`<b>${esc(name)}</b><br/>${esc(home.address)}<br/><span style="opacity:.6">${t('map.home_hint')}</span>`)
         .addTo(g);
       L.marker([home.lat, home.lng], {
-        icon: L.divIcon({ className: '', html: `<div class="pin-label">${name}</div>`, iconAnchor: [-12, 8] }),
+        icon: L.divIcon({ className: '', html: `<div class="pin-label">${esc(name)}</div>`, iconAnchor: [-12, 8] }),
         interactive: false,
       }).addTo(g);
     }
     for (const a of anchors.filter((x) => x.pinned)) {
       L.marker([a.lat, a.lng], { icon: flagIcon(a.scored) })
-        .bindPopup(`<b>${a.name}</b>${a.note ? `<br/>${a.note}` : ''}<br/><span style="opacity:.6">${t(a.scored ? 'map.anchor_scored' : 'map.anchor_unscored')}</span>`)
+        .bindPopup(`<b>${esc(a.name)}</b>${a.note ? `<br/>${esc(a.note)}` : ''}<br/><span style="opacity:.6">${t(a.scored ? 'map.anchor_scored' : 'map.anchor_unscored')}</span>`)
         .addTo(g);
       L.marker([a.lat, a.lng], {
-        icon: L.divIcon({ className: '', html: `<div class="pin-label">${a.name}</div>`, iconAnchor: [-8, 8] }),
+        icon: L.divIcon({ className: '', html: `<div class="pin-label">${esc(a.name)}</div>`, iconAnchor: [-8, 8] }),
         interactive: false,
       }).addTo(g);
     }
@@ -173,8 +173,8 @@ export default function MapView({
         fillOpacity: 0.95,
       })
         .bindPopup(
-          `<b>${l.address}</b><br/>`
-          + `${money(l.price)}${l.unit_type ? ` · ${l.unit_type}` : ''}<br/>`
+          `<b>${esc(l.address)}</b><br/>`
+          + `${money(l.price)}${l.unit_type ? ` · ${esc(l.unit_type)}` : ''}<br/>`
           + `<span style="opacity:.75">${t('list.safety')} ${l.safety ?? '–'}  ${t('list.convenience')} ${l.convenience ?? '–'}</span>`
         )
         .on('click', () => onSelect?.(l.id))
@@ -243,6 +243,8 @@ function ringArea(poly) {
   return Math.abs(sum / 2);
 }
 
+// Everything put into popup HTML goes through this. Addresses and pin names come from
+// Zillow pages, screenshots read by a model, and the user, none of which is markup.
 const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /**

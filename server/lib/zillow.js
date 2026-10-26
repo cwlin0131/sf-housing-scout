@@ -159,7 +159,13 @@ function fromProperty(p, url) {
   };
 }
 
-/** Used by the refresh pass to decide whether a saved listing has gone away. */
+/**
+ * Used by the refresh pass to decide whether a saved listing has gone away.
+ *
+ * `live` is null when the page could not be read. That is not the same as "gone": Zillow
+ * changes its internal shape without notice, and treating an unreadable page as a removed
+ * listing would deactivate every saved listing at once the day it does.
+ */
 export function stillListed(nextData) {
   const b = nextData?.props?.pageProps?.componentProps?.initialReduxState?.gdp?.building;
   if (b) {
@@ -173,5 +179,5 @@ export function stillListed(nextData) {
       if (property) return { live: property.homeStatus === 'FOR_RENT', status: property.homeStatus };
     } catch { /* unknown shape */ }
   }
-  return { live: false, status: 'UNKNOWN' };
+  return { live: null, status: 'UNKNOWN' };
 }

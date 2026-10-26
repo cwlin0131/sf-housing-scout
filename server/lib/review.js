@@ -12,7 +12,7 @@ import { SYSTEM, ask, buildBrief, pickLang } from './prompts/review.js';
  * is what keeps it from inventing cafes and street names.
  */
 
-const MODEL = 'claude-opus-5';
+const MODEL = 'claude-opus-5-5';
 
 let client = null;
 function anthropic() {
@@ -28,13 +28,14 @@ export async function writeReview(listing, breakdown, rawLang) {
   const brief = buildBrief(listing, breakdown, lang, settings().budget);
   const res = await anthropic().messages.create({
     model: MODEL,
-    // Opus 5 thinks by default, and max_tokens caps thinking plus visible text
+    // Opus 5.5 always thinks, and max_tokens caps thinking plus visible text
     // together. At 700 a review that reasoned a little longer ran out of budget
     // and stopped mid-sentence, with nothing in the response saying so. The
     // paragraph itself needs a few hundred tokens; the rest is headroom.
     max_tokens: 3000,
     // The judgement was already made by the scorer. This call only has to say it
-    // well, so paying for deep reasoning buys nothing but latency.
+    // well, so paying for deep reasoning buys nothing but latency. Effort is the
+    // only thinking control on this model; thinking itself cannot be switched off.
     output_config: { effort: 'low' },
     system: SYSTEM[lang],
     messages: [{ role: 'user', content: `${brief}\n\n${ask(lang)}` }],

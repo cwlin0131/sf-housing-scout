@@ -8,7 +8,7 @@ import { t } from '../i18n/index.js';
  * is stale the moment these change. Each score also records the settings it was computed
  * under, so a list built over months can still be read honestly.
  */
-export default function SettingsPanel({ settings, onSave }) {
+export default function SettingsPanel({ settings, onSave, areaNames = [] }) {
   const [draft, setDraft] = useState(settings);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -77,7 +77,7 @@ export default function SettingsPanel({ settings, onSave }) {
       <section>
         <h3>{t('settings.avoid_title')}</h3>
         <p className="hint">{t('settings.avoid_hint')}</p>
-        <AvoidList items={draft.avoid || []} onChange={setAvoid} />
+        <AvoidList items={draft.avoid || []} onChange={setAvoid} names={areaNames} />
       </section>
 
       <section>
@@ -126,7 +126,10 @@ export default function SettingsPanel({ settings, onSave }) {
  * does not label. The cap is a ceiling rather than a subtraction: the point is "no matter
  * what the numbers say, I am not living here", and the card states that it was applied.
  */
-function AvoidList({ items, onChange }) {
+// Matching is on whole names, so the box suggests the ones the map actually knows. A typed
+// name that is not on the list still saves; it just only matches a listing whose own
+// neighbourhood field is spelled the same way.
+function AvoidList({ items, onChange, names }) {
   const [name, setName] = useState('');
   const [cap, setCap] = useState(35);
 
@@ -155,6 +158,7 @@ function AvoidList({ items, onChange }) {
       <div className="avoid-row">
         <input
           placeholder={t('settings.avoid_name')}
+          list="avoid-area-names"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
@@ -166,6 +170,9 @@ function AvoidList({ items, onChange }) {
         />
         <button className="ghost" onClick={add} disabled={!name.trim()}>{t('settings.avoid_add')}</button>
       </div>
+      <datalist id="avoid-area-names">
+        {names.map((n) => <option key={n} value={n} />)}
+      </datalist>
     </>
   );
 }

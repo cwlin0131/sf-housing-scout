@@ -38,6 +38,7 @@ export const CODES = {
   'listing.located_but_ungeocodable': 'Read the listing but could not place its address on the map.',
   'listing.empty_input': 'Paste a Zillow link, an address, or a screenshot.',
   'listing.bad_image': 'Image {index} is not in a format we can read.',
+  'listing.too_many_images': 'Eight screenshots at most per listing.',
   'listing.not_found': 'No such listing.',
   'listing.bad_status': 'Unknown status: {status}.',
   'candidate.expired': 'That preview has expired. Paste it again.',
@@ -52,6 +53,8 @@ export const CODES = {
   'settings.ideal_above_max': 'The sweet spot cannot be higher than the reference line.',
   'settings.weights_both_zero': 'The two weights cannot both be zero.',
   'settings.not_a_boolean': '{path} has to be true or false.',
+  'settings.home_geocode_failed': 'Could not find that address in San Francisco.',
+  'settings.home_invalid': 'The core address needs both an address and a location.',
   'settings.avoid_invalid': 'Each avoided area needs a name and a cap between 0 and 100.',
 
   'ai.no_key': 'This needs an Anthropic API key. Screenshot reading and the written note are off without one; everything else works.',
@@ -59,6 +62,6 @@ export const CODES = {
   'ai.truncated': 'The model ran out of room before finishing.',
   'ai.no_output': 'The model returned nothing usable.',
 
-  'fetch.chrome_missing': 'Could not find Chrome. Set CHROME_PATH to your chrome.exe.',
+  'fetch.chrome_missing': 'Could not find Chrome. Set CHROME_PATH in .env to the Chrome program on this computer.',
   'fetch.blocked': 'Zillow is showing a challenge. Solve it in the Chrome window that opened.',
 };

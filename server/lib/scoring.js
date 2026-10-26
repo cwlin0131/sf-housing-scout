@@ -24,19 +24,32 @@ const nightWeight = (hour) => {
 };
 
 /**
+ * The date the windows below count back from: the newest incident on disk, not today.
+ *
+ * Counting back from today meant the data aged out from under the score between syncs.
+ * Two months after a sync the twelve-month window held only ten months of incidents, so
+ * every address read safer than it had, by an amount that depended on nothing but how
+ * long ago `npm run sync` was run. Anchoring on the data keeps a score stable until new
+ * data arrives, and the status line already says how old that data is.
+ */
+function dataEnd() {
+  return db.prepare('SELECT MAX(occurred) d FROM incident').get().d;
+}
+
+/**
  * Distance-decayed, night-weighted incident load around a point. An incident 50 m away
  * shapes the walk home far more than one 380 m away, so raw counts inside a radius are
  * the wrong unit.
  */
-function weightedLoad(lat, lng, kind, radius, months) {
+function weightedLoad(lat, lng, kind, radius, months, end) {
   const { dLat, dLng } = bboxDeltas(lat, radius);
   const rows = db
     .prepare(
       `SELECT lat, lng, hour, category FROM incident
-       WHERE kind = ? AND occurred >= date('now', ?)
+       WHERE kind = ? AND occurred >= date(?, ?)
          AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?`
     )
-    .all(kind, `-${months} months`, lat - dLat, lat + dLat, lng - dLng, lng + dLng);
+    .all(kind, end, `-${months} months`, lat - dLat, lat + dLat, lng - dLng, lng + dLng);
 
   let load = 0;
   let count = 0;
@@ -98,32 +111,36 @@ export function loadToScore(load) {
 }
 
 export function safetyScore(lat, lng, neighborhood) {
-  const haveData = db.prepare('SELECT COUNT(*) n FROM incident').get().n > 0;
+  const end = dataEnd();
   const zone = zoneAt(lat, lng);
 
-  if (!haveData) {
+  const place = placeAt(lat, lng);
+
+  if (!end) {
     // Before the first sync, fall back to the curated area read so the tool is still
     // usable on day one. Marked clearly so nobody mistakes it for measured data.
-    const score = zone ? (zone.tier - 1) * 25 : 50;
+    // An area the user ruled out still caps it: that judgement does not wait for a sync.
+    const { score, capped } = applyAvoid(zone ? (zone.tier - 1) * 25 : 50, [neighborhood, zone?.name, place]);
     return {
       score,
       basis: 'zone-only',
-      place: placeAt(lat, lng),
+      place,
       zone: zone ? { name: zone.name, tier: zone.tier, summary: zone.summary } : null,
+      capped,
       note: { code: 'no_crime_data' },
       parts: {},
     };
   }
 
-  const personal = weightedLoad(lat, lng, 'personal', SAFETY.radius.personal, SAFETY.months.personal);
-  const property = weightedLoad(lat, lng, 'property', SAFETY.radius.property, SAFETY.months.property);
-  const street = weightedLoad(lat, lng, 'street', SAFETY.radius.street, SAFETY.months.street);
+  const personal = weightedLoad(lat, lng, 'personal', SAFETY.radius.personal, SAFETY.months.personal, end);
+  const property = weightedLoad(lat, lng, 'property', SAFETY.radius.property, SAFETY.months.property, end);
+  const street = weightedLoad(lat, lng, 'street', SAFETY.radius.street, SAFETY.months.street, end);
 
   const pPersonal = toPercentile(personal.load, 'personal') ?? 0.5;
   const pProperty = toPercentile(property.load, 'property') ?? 0.5;
   const pStreet = toPercentile(street.load, 'street') ?? 0.5;
 
-  const trend = trendAdjustment(lat, lng);
+  const trend = trendAdjustment(lat, lng, end);
 
   const w = SAFETY.weights;
   const wSum = w.personal + w.property + w.street;
@@ -135,19 +152,9 @@ export function safetyScore(lat, lng, neighborhood) {
   let score = Math.round(loadToScore(composite) - trend.penalty);
   score = Math.max(0, Math.min(100, score));
 
-  // Lived experience beats a statistic. Areas the user has walked and ruled out get capped.
-  // Matched against the common name too, not just the coarse zone: someone who rules out
-  // Dogpatch is naming a place that no zone is called.
-  const place = placeAt(lat, lng);
-  const names = [neighborhood, zone?.name, place].filter(Boolean).map((n) => n.toLowerCase());
-  const flag = (settings().avoid || []).find((f) =>
-    names.some((n) => n.includes(f.name.toLowerCase()))
-  );
-  let capped = null;
-  if (flag && score > flag.cap) {
-    capped = { name: flag.name, from: score, to: flag.cap };
-    score = flag.cap;
-  }
+  const avoided = applyAvoid(score, [neighborhood, zone?.name, place]);
+  score = avoided.score;
+  const { capped } = avoided;
 
   return {
     score,
@@ -164,20 +171,34 @@ export function safetyScore(lat, lng, neighborhood) {
   };
 }
 
+/**
+ * Lived experience beats a statistic. Areas the user has walked and ruled out get capped.
+ * Matched against the common name too, not just the coarse zone: someone who rules out
+ * Dogpatch is naming a place that no zone is called.
+ *
+ * Whole names only. A substring match meant ruling out "Mission" also capped Mission Bay
+ * and Mission Dolores, which are different places with different reads.
+ */
+function applyAvoid(score, candidates) {
+  const names = candidates.filter(Boolean).map((n) => n.trim().toLowerCase());
+  const flag = (settings().avoid || []).find((f) => names.includes(f.name.trim().toLowerCase()));
+  if (!flag || score <= flag.cap) return { score, capped: null };
+  return { score: flag.cap, capped: { name: flag.name, from: score, to: flag.cap } };
+}
+
 /** Is this block getting better or worse? Last 3 months against the same window a year back. */
-function trendAdjustment(lat, lng) {
+function trendAdjustment(lat, lng, end) {
   const { dLat, dLng } = bboxDeltas(lat, SAFETY.radius.personal);
   const q = (fromMod, toMod) =>
     db
       .prepare(
         `SELECT COUNT(*) n FROM incident
-         WHERE kind = 'personal' AND occurred >= date('now', ?) AND occurred < date('now', ?)
+         WHERE kind = 'personal' AND occurred >= date(?, ?) AND occurred < date(?, ?)
            AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?`
       )
-      .get(fromMod, toMod, lat - dLat, lat + dLat, lng - dLng, lng + dLng).n;
+      .get(end, fromMod, end, toMod, lat - dLat, lat + dLat, lng - dLng, lng + dLng).n;
 
-  // '+1 day' rather than 'now': date('now','now') is not a valid modifier and returns
-  // NULL, which silently makes every comparison false.
+  // '+1 day' so the window includes `end` itself; the comparison is strictly-less-than.
   //
   // The baseline is the preceding three months, not the same three months a year ago. The
   // year-ago window looked better on paper but sat almost entirely outside the data: the
@@ -191,7 +212,7 @@ function trendAdjustment(lat, lng) {
 
   // If the data cannot cover the baseline window, say nothing rather than guess.
   const earliest = db.prepare(`SELECT MIN(occurred) d FROM incident WHERE kind = 'personal'`).get().d;
-  const covered = earliest && earliest <= db.prepare(`SELECT date('now','-6 months') d`).get().d;
+  const covered = earliest && earliest <= db.prepare(`SELECT date(?, '-6 months') d`).get(end).d;
   if (!covered) return { now, prior, direction: 'unknown', changePct: null, penalty: 0 };
 
   // A percentage change on a handful of incidents is noise: a quiet block going from 4 to
@@ -296,12 +317,7 @@ async function terrainPenalty(lat, lng, transit) {
   const best = [transit.bart, transit.muni_metro].filter(Boolean).sort((a, b) => a.metres - b.metres)[0];
   if (!best) return { score: null, note: { code: 'no_stop_nearby' } };
 
-  const stop = { lat: null, lng: null };
-  const stops = (await import('./geo.js')).loadStops();
-  const match = stops.find((s) => s.name === best.name);
-  if (!match) return { score: null, note: { code: 'no_stop_coords' } };
-  stop.lat = match.lat;
-  stop.lng = match.lng;
+  const stop = { lat: best.lat, lng: best.lng };
 
   const key = `elev:${lat.toFixed(4)},${lng.toFixed(4)}|${stop.lat.toFixed(4)},${stop.lng.toFixed(4)}`;
   let elev = cacheGet(key, 3650);

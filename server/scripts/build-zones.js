@@ -15,6 +15,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SOURCES, AREAS } from '../data/area-reads.js';
+import { DATA_DIR } from '../lib/paths.js';
 
 const BOUNDARIES = 'https://data.sf.gov/resource/ajp5-b2md.geojson';
 // The city publishes two neighbourhood sets. The 41 "Analysis Neighborhoods" above are an
@@ -23,7 +24,7 @@ const BOUNDARIES = 'https://data.sf.gov/resource/ajp5-b2md.geojson';
 // Rincon Hill exist here but are swallowed by Potrero Hill and Financial District above.
 // They carry no tier, only a label.
 const PLACES = 'https://data.sf.gov/resource/gfpk-269f.geojson';
-const OUT = resolve(process.cwd(), 'data/safety-zones.json');
+const OUT = resolve(DATA_DIR, 'safety-zones.json');
 
 
 

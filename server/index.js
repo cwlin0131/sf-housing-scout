@@ -1,10 +1,9 @@
 import Fastify from 'fastify';
-import cors from '@fastify/cors';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { db } from './lib/db.js';
-import { USER_DIR } from './lib/paths.js';
+import { USER_DIR, DATA_DIR, DIST_DIR } from './lib/paths.js';
 import { state as fetchState, markUnblocked, shutdown } from './lib/fetcher.js';
 import { allZones, reload as reloadZones } from './lib/zones.js';
 import { crimeTable } from './lib/crimetable.js';
@@ -20,7 +19,31 @@ import {
 } from './lib/listings.js';
 
 const app = Fastify({ logger: false, bodyLimit: 40 * 1024 * 1024 }); // screenshots are large
-await app.register(cors, { origin: true });
+
+/**
+ * Only this machine's own pages may talk to the API.
+ *
+ * Binding to 127.0.0.1 keeps other computers out but not other websites: any page open in
+ * the same browser can send requests to localhost. With CORS open to every origin, which is
+ * how this started, such a page could also read the answers, so the whole list, the pins
+ * and the core address were one fetch away from any site. The interface is served from
+ * this same origin (and through Vite's proxy in development), so it never needed CORS.
+ *
+ * The Host check closes the other route in, DNS rebinding, where a hostile domain is
+ * re-pointed at 127.0.0.1 so the browser treats it as same-origin.
+ */
+const LOCAL_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+app.addHook('onRequest', async (req, reply) => {
+  if (!LOCAL_HOST.test(req.headers.host || '')) {
+    return reply.code(403).send({ ok: false, error: 'Forbidden host' });
+  }
+  // A cross-site page can still fire a request without reading the answer. Refuse those
+  // too, so it cannot change settings or add listings blind.
+  const origin = req.headers.origin;
+  if (origin && !LOCAL_HOST.test(origin.replace(/^https?:\/\//i, ''))) {
+    return reply.code(403).send({ ok: false, error: 'Forbidden origin' });
+  }
+});
 
 const ok = (reply, data) => reply.send({ ok: true, ...data });
 /**
@@ -116,7 +139,7 @@ app.post('/api/zones/reload', async (_req, reply) => ok(reply, { zones: reloadZo
 
 app.get('/api/transit', async (_req, reply) => {
   const read = (f) => {
-    const p = resolve(process.cwd(), 'data', f);
+    const p = resolve(DATA_DIR, f);
     return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : { type: 'FeatureCollection', features: [] };
   };
   return ok(reply, { lines: read('transit-lines.geojson'), stops: read('transit-stops.geojson') });
@@ -197,13 +220,30 @@ app.post('/api/candidates', async (req, reply) => {
   }
 });
 
+const EDITABLE_NUMBERS = ['price', 'monthly_fees', 'beds', 'baths', 'sqft'];
+function cleanEdits(edits) {
+  const out = {};
+  if (!edits || typeof edits !== 'object') return out;
+  if (typeof edits.address === 'string' && edits.address.trim()) out.address = edits.address.trim();
+  for (const k of EDITABLE_NUMBERS) {
+    if (!(k in edits)) continue;
+    const v = edits[k] == null || edits[k] === '' ? null : Number(edits[k]);
+    // A stray letter in the box turns into NaN, which would be stored and then sorted as
+    // if it were a price. Treat it as "not given" instead.
+    out[k] = Number.isFinite(v) ? v : null;
+  }
+  return out;
+}
+
 app.post('/api/candidates/:token/save', async (req, reply) => {
   try {
     const candidate = pending.get(req.params.token);
     if (!candidate) failWith('candidate.expired', 'That preview has expired. Paste it again.');
     // Let the user fix anything the screenshot reader got wrong before it is committed.
-    if (req.body?.edits) Object.assign(candidate.listing, req.body.edits);
-    const saved = saveCandidate(candidate, req.body?.status || 'saved');
+    // Only the fields the preview card offers: anything else, the coordinates above all,
+    // would leave the stored scores describing a different place from the stored record.
+    Object.assign(candidate.listing, cleanEdits(req.body?.edits));
+    const saved = saveCandidate(candidate, 'saved');
     pending.delete(req.params.token);
     return ok(reply, { listing: saved });
   } catch (err) {
@@ -225,9 +265,13 @@ app.post('/api/candidates/:token/reject', async (req, reply) => {
 
 // ---------------------------------------------------------------- the list
 
-app.get('/api/listings', async (req, reply) =>
-  ok(reply, { listings: listListings({ status: req.query.status || 'saved' }) })
-);
+app.get('/api/listings', async (req, reply) => {
+  try {
+    return ok(reply, { listings: listListings({ status: req.query.status || 'saved' }) });
+  } catch (err) {
+    return fail(reply, err);
+  }
+});
 
 app.get('/api/listings/:id', async (req, reply) => {
   const row = getListing(+req.params.id);
@@ -274,10 +318,9 @@ app.post('/api/rescore', async (_req, reply) => {
 
 // ---------------------------------------------------------------- serve the UI in prod
 
-const dist = resolve(process.cwd(), 'dist');
-if (existsSync(dist)) {
+if (existsSync(DIST_DIR)) {
   const staticPlugin = (await import('@fastify/static')).default;
-  await app.register(staticPlugin, { root: dist });
+  await app.register(staticPlugin, { root: DIST_DIR });
   app.setNotFoundHandler((req, reply) =>
     req.url.startsWith('/api') ? reply.code(404).send({ ok: false, error: 'not found' })
                                : reply.sendFile('index.html')

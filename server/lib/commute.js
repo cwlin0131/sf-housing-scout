@@ -1,6 +1,6 @@
 import { distanceMetres, walkMinutes, loadStops } from './geo.js';
 import { settings } from './settings.js';
-import { COMMUTE } from './config.js';
+import { COMMUTE, LIFESTYLE } from './config.js';
 
 /**
  * Door-to-door time from a listing to the user's core address.
@@ -71,7 +71,7 @@ function transferPoints() {
 function reachable(lat, lng) {
   return loadStops()
     .map((s) => ({ ...s, walk: walkTo(lat, lng, s) }))
-    .filter((s) => s.walk * 80 <= COMMUTE.maxStopWalkMetres || s.walk <= 3);
+    .filter((s) => s.walk * LIFESTYLE.walkMetresPerMinute <= COMMUTE.maxStopWalkMetres || s.walk <= 3);
 }
 
 /**
@@ -99,7 +99,7 @@ function bestRail(oLat, oLng, dLat, dLng) {
   for (const o of from) {
     for (const k of linesOf(o)) {
       for (const d of toByLine.get(k) || []) {
-        if (o.stop_id === d.stop_id && o.name === d.name) continue;
+        if (o.name === d.name) continue;
         const ride = rideMinutes(o, d, k);
         consider(o.walk + COMMUTE.waitMinutes + ride + d.walk, [
           { walk: o.walk, board: o.name, line: k, alight: d.name, ride, walkAfter: d.walk },
@@ -115,17 +115,15 @@ function bestRail(oLat, oLng, dLat, dLng) {
       for (const [kb, dests] of toByLine) {
         if (kb === ka) continue;
         for (const [x, y] of changes.get(`${ka}|${kb}`) || []) {
-          {
-            const first = rideMinutes(o, x, ka);
-            for (const d of dests) {
-              const total = o.walk + COMMUTE.waitMinutes + first + COMMUTE.transferMinutes
-                + rideMinutes(y, d, kb) + d.walk;
-              if (best && total >= best.minutes) continue;
-              consider(total, [
-                { walk: o.walk, board: o.name, line: ka, alight: x.name, ride: first },
-                { board: y.name, line: kb, alight: d.name, ride: rideMinutes(y, d, kb), walkAfter: d.walk },
-              ]);
-            }
+          const first = rideMinutes(o, x, ka);
+          for (const d of dests) {
+            const second = rideMinutes(y, d, kb);
+            const total = o.walk + COMMUTE.waitMinutes + first + COMMUTE.transferMinutes + second + d.walk;
+            if (best && total >= best.minutes) continue;
+            consider(total, [
+              { walk: o.walk, board: o.name, line: ka, alight: x.name, ride: first },
+              { board: y.name, line: kb, alight: d.name, ride: second, walkAfter: d.walk },
+            ]);
           }
         }
       }

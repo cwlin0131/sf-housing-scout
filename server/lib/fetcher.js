@@ -20,11 +20,22 @@ const MAX_GAP_MS = 45_000;
 const WARM_AFTER_MS = 20 * 60_000;
 const NAV_SETTLE_MS = 11_000;
 
+// CHROME_PATH first, so an explicit choice always wins over a guess.
 const CHROME_CANDIDATES = [
+  process.env.CHROME_PATH,
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  process.env.CHROME_PATH,
+  process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
 ].filter(Boolean);
+
+// Longest a single DevTools command may take. Navigation returns as soon as the request is
+// issued (settling is a separate sleep), so anything near this means Chrome has gone.
+const CDP_TIMEOUT_MS = 30_000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const jitter = () => MIN_GAP_MS + Math.random() * (MAX_GAP_MS - MIN_GAP_MS);
@@ -53,7 +64,7 @@ let chain = Promise.resolve();
 
 function findChrome() {
   const hit = CHROME_CANDIDATES.find((p) => existsSync(p));
-  if (!hit) fail('fetch.chrome_missing', 'Could not find Chrome. Set CHROME_PATH to your chrome executable.');
+  if (!hit) fail('fetch.chrome_missing', 'Could not find Chrome. Set CHROME_PATH in .env to the Chrome program on this computer.');
   return hit;
 }
 
@@ -112,10 +123,16 @@ async function withPage(fn) {
     ws.addEventListener('error', () => rej(new Error('CDP connection failed')));
   });
 
+  // Without a timeout, a Chrome window closed mid-request left this promise pending for
+  // good, and since fetches are queued one after another, every later paste waited on it.
   const send = (method, params = {}) => {
     const myId = ++id;
-    return new Promise((res) => {
-      pending.set(myId, res);
+    return new Promise((res, rej) => {
+      const timer = setTimeout(() => {
+        pending.delete(myId);
+        rej(new Error(`Chrome stopped responding (${method}).`));
+      }, CDP_TIMEOUT_MS);
+      pending.set(myId, (msg) => { clearTimeout(timer); res(msg); });
       ws.send(JSON.stringify({ id: myId, method, params }));
     });
   };

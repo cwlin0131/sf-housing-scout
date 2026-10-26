@@ -293,7 +293,7 @@ export default function App() {
                 onUpdate={async (id, body) => { await api.updateAnchor(id, body); await reloadAnchors(); }}
                 onDelete={async (id) => { await api.deleteAnchor(id); await reloadAnchors(); }}
               />
-              <SettingsPanel settings={settings} onSave={saveSettings} />
+              <SettingsPanel settings={settings} onSave={saveSettings} areaNames={[...new Set([...places, ...zones].map((p) => p.name))].sort()} />
             </>
           )}
 

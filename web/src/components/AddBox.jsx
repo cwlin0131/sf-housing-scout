@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { t } from '../i18n/index.js';
 
 /**
@@ -15,6 +15,15 @@ export default function AddBox({ onScore, busy }) {
   const [shots, setShots] = useState([]);
   const [err, setErr] = useState(null);
   const fileRef = useRef(null);
+  // The first score near a new spot looks up shops and elevation from shared free services,
+  // which can take most of a minute. Without a word, a button that says "Scoring…" that
+  // long reads as frozen.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!busy) { setSlow(false); return undefined; }
+    const id = setTimeout(() => setSlow(true), 6000);
+    return () => clearTimeout(id);
+  }, [busy]);
   // Nearly every input here is one line, so Enter submits by default. Anyone pasting a
   // multi-line address wants the opposite, hence the switch, remembered between sessions.
   const [enterSubmits, setEnterSubmits] = useState(
@@ -151,7 +160,8 @@ export default function AddBox({ onScore, busy }) {
       </label>
 
       {err && <div className="warnbox"><b>{t('add.failed')}</b><span>{err}</span></div>}
-      {!shots.length && !err && (
+      {slow && <div className="hint">{t('add.slow_hint')}</div>}
+      {!shots.length && !err && !slow && (
         <div className="hint">{t('add.address_only_hint')}</div>
       )}
     </div>
