@@ -2,7 +2,9 @@
 // Bump RUBRIC_VERSION whenever a weight or threshold changes: stored scores record the version
 // they were computed under, so a list built over months stays comparable.
 
-export const RUBRIC_VERSION = '1.0.0';
+// 1.1.0: walking time to your pins uses street distance (COMMUTE.streetFactor), not a
+// straight line, so convenience scores for the same address come out a little lower.
+export const RUBRIC_VERSION = '1.1.0';
 export const PROMPT_VERSION = '3.0.0';
 
 /**
@@ -55,6 +57,7 @@ export const DEFAULT_SETTINGS = {
  */
 export const COMMUTE = {
   // Straight lines understate street distance. 1.3 is typical for a grid with hills.
+  // Also used for walking time to your pins in the convenience score, so the two agree.
   streetFactor: 1.3,
   railFactor: 1.1,
   speedKmh: { bart: 40, muni: 20 },

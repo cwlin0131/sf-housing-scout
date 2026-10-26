@@ -149,6 +149,10 @@ Walking time to your own pins is 40% of it, then rail access, everyday amenities
 terrain. Anything that could not be measured drops out and shares its weight among the rest
 rather than silently scoring zero.
 
+Walking time is street distance, estimated as 1.3 times the straight line, which is the same
+estimate the commute uses, so the pin and the commute on one card agree. Scores saved under
+rubric 1.0.0 measured a straight line and read slightly higher; "Rescore" brings them up to date.
+
 Rail means BART and Muni Metro. Buses are not counted, which materially understates places
 like the Richmond and Pacific Heights where the bus service is genuinely good. That is a
 deliberate choice, not an oversight, and worth knowing before you read a low number as "no

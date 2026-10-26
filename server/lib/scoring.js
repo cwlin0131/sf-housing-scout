@@ -1,7 +1,7 @@
 import { db, cacheGet, cacheSet } from './db.js';
 import { distanceMetres, bboxDeltas, walkMinutes, amenitiesNear, nearestTransit, anchors } from './geo.js';
 import { zoneAt, placeAt } from './zones.js';
-import { RUBRIC_VERSION, SAFETY, CONVENIENCE } from './config.js';
+import { RUBRIC_VERSION, SAFETY, CONVENIENCE, COMMUTE } from './config.js';
 import { settings, scoringSnapshot } from './settings.js';
 
 /**
@@ -236,7 +236,10 @@ function trendAdjustment(lat, lng, end) {
 export async function convenienceScore(lat, lng, listing = {}) {
   const list = anchors().filter((a) => a.scored);
   const anchorDetail = list.map((a) => {
-    const metres = Math.round(distanceMetres(lat, lng, a.lat, a.lng));
+    // Street distance, the same estimate the commute uses. Straight-line distance made
+    // the pin read several minutes closer than the commute line on the same card, and
+    // the gap grew with distance, so far-out listings were flattered the most.
+    const metres = Math.round(distanceMetres(lat, lng, a.lat, a.lng) * COMMUTE.streetFactor);
     return { name: a.name, note: a.note, weight: a.weight, metres, minutes: +walkMinutes(metres).toFixed(0) };
   });
 
