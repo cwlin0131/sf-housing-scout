@@ -1,0 +1,12 @@
+flowchart TB
+  IN["One input box<br/>URL / address / several screenshots"]
+  IN --> DUP{"Seen this<br/>before?"}
+  DUP -- yes --> WARN["Say so plainly<br/>when you saw it, what it cost then<br/>whether you kept it or dropped it"]
+  WARN --> CARD
+  DUP -- no --> SCORE["Two measured scores<br/>safety and convenience<br/>price stays information"]
+  SCORE --> CARD["Preview card<br/>both scores + rent + full breakdown<br/>a short note in your language"]
+  CARD --> KEEP["Save to the list"]
+  CARD --> DROP["Discard<br/>kept as rejected, so the dedupe<br/>can remind you next time"]
+  KEEP --> LIST["The list<br/>sort by any column, click back to the map"]
+  LIST --> REF["Refresh<br/>still up? has the rent moved?<br/>URL-sourced listings only"]
+  REF --> DEAD["Gone means marked, never deleted<br/>the row stays as a benchmark"]

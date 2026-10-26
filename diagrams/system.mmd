@@ -1,0 +1,49 @@
+flowchart TB
+  subgraph UI["Frontend: React and Vite, served on localhost"]
+    ADD["Add a listing<br/>URL / address / pasted screenshots"]
+    PREV["Preview card<br/>two scores + breakdown + note<br/>keep or discard"]
+    LIST["The list<br/>sortable, clicks back to the map<br/>shortlist, notes, refresh"]
+    MAP["Map<br/>area overlay + listing pins"]
+    SET["Settings<br/>your pins, rent reference line<br/>areas you rule out"]
+  end
+
+  subgraph API["Local service: Node and Fastify"]
+    VISION["Screenshot reader<br/>Claude vision, forced tool call"]
+    FETCH["Fetch queue<br/>pacing and block detection"]
+    NORM["Normalise<br/>one adapter per Zillow page shape"]
+    GEO["Geocode<br/>DataSF address lookup, cached"]
+    SCORE["Scoring<br/>safety, convenience, price"]
+    LLM["Note writer<br/>one prompt per language"]
+    REFRESH["Refresh<br/>still listed, and has the rent moved"]
+  end
+
+  subgraph DATA["Local data"]
+    DB[("SQLite<br/>listings / snapshots / scores / notes / settings")]
+    CACHE[("Geo cache<br/>incident grid, amenities")]
+    ZONES[("Area reads<br/>41 tiers, 117 common names")]
+  end
+
+  subgraph EXT["External"]
+    CHROME["Dedicated Chrome<br/>driven over CDP, you solve the challenge"]
+    SF["DataSF<br/>SFPD, 311, dispatch, addresses"]
+    OSM["OpenStreetMap<br/>Overpass amenities"]
+    CLAUDE["Claude API<br/>optional, bring your own key"]
+  end
+
+  ADD -- url --> FETCH --> CHROME
+  CHROME --> NORM
+  ADD -- screenshots --> VISION --> NORM
+  ADD -- address --> GEO
+  NORM --> GEO --> DB
+  GEO --> SCORE
+  SCORE <--> CACHE
+  SCORE --> ZONES
+  SET --> SCORE
+  CACHE -. weekly sync .-> SF
+  CACHE -. first lookup, then cached .-> OSM
+  SCORE --> LLM --> CLAUDE
+  LLM --> DB
+  DB --> PREV --> LIST
+  DB --> MAP
+  LIST --> REFRESH --> FETCH
+  VISION -.-> CLAUDE

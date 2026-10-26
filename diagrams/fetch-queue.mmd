@@ -1,0 +1,13 @@
+flowchart TB
+  A["You paste a URL"] --> Q["Fetch queue"]
+  Q --> P{"Long enough<br/>since the last request?"}
+  P -- no --> W["Wait<br/>25 to 45 seconds, jittered"]
+  W --> P
+  P -- yes --> I{"Idle for<br/>over 20 minutes?"}
+  I -- yes --> WM["Warm up<br/>open zillow.com first"]
+  WM --> N
+  I -- no --> N["Navigate to the listing"]
+  N --> D{"Challenged?"}
+  D -- yes --> B["Queue parks<br/>the interface tells you<br/>hold the button in that Chrome window"]
+  B --> R["You press Done<br/>the queue resumes"]
+  D -- no --> X["Read __NEXT_DATA__<br/>normalise and store"]
