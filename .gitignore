@@ -1,10 +1,11 @@
 node_modules/
 dist/
+# Your own data (see server/lib/paths.js). The old locations stay ignored too.
+local/
 data/*.db
 data/*.db-*
 data/*.backup.db
 data/chrome-profile/
-.env
 
 # local secrets
 .env

@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { db } from './lib/db.js';
+import { USER_DIR } from './lib/paths.js';
 import { state as fetchState, markUnblocked, shutdown } from './lib/fetcher.js';
 import { allZones, reload as reloadZones } from './lib/zones.js';
 import { crimeTable } from './lib/crimetable.js';
@@ -286,6 +287,7 @@ if (existsSync(dist)) {
 const PORT = +(process.env.PORT || 8787);
 await app.listen({ port: PORT, host: '127.0.0.1' });
 console.log(`SF Housing Scout API  http://127.0.0.1:${PORT}`);
+console.log(`Your data: ${USER_DIR}`);
 if (apiKey()) {
   console.log('API key loaded. Screenshot reading and written notes are available.');
 } else {

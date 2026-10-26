@@ -1,10 +1,6 @@
 import Database from 'better-sqlite3';
-import { mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import { DEFAULT_ANCHORS } from './config.js';
-
-const DB_PATH = resolve(process.cwd(), 'data/sf-housing.db');
-mkdirSync(dirname(DB_PATH), { recursive: true });
+import { DB_PATH } from './paths.js';
 
 export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
