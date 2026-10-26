@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fail } from './errors.js';
 import { existsSync, mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { CHROME_PROFILE } from './paths.js';
 
 /**
  * Drives one long-lived, visible Chrome over the DevTools Protocol.
@@ -14,7 +14,7 @@ import { resolve } from 'node:path';
  */
 
 const PORT = 9333;
-const PROFILE = resolve(process.cwd(), 'data/chrome-profile');
+const PROFILE = CHROME_PROFILE;
 const MIN_GAP_MS = 25_000;
 const MAX_GAP_MS = 45_000;
 const WARM_AFTER_MS = 20 * 60_000;

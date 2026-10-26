@@ -4,8 +4,10 @@ A local tool for finding somewhere to live in San Francisco. You paste a Zillow 
 few screenshots, it scores the location on safety and convenience, pins it on the map, and
 writes you a short note about the block. You decide whether it goes on the list.
 
-Everything runs on your machine. Your listings live in `data/sf-housing.db`, a single
-SQLite file you can back up by copying it.
+Everything runs on your machine. Your listings, pins and settings live in one SQLite file,
+`sf-housing.db`, kept in its own folder apart from the code: `local/` by default, or
+wherever `SF_HOUSING_DATA` in `.env` points. Back it up by copying that folder. Pulling a
+new version of the code never touches it.
 
 **This only works for San Francisco.** The crime data, the address lookup, the
 neighbourhood boundaries and the rail network are all specific to the city. Pointing it at
